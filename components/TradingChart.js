@@ -16,6 +16,7 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
   const chartContainerRef = useRef(null)
   const chartRef = useRef(null)
   const candlestickSeriesRef = useRef(null)
+  const isChartReady = useRef(false)
   const [drawings, setDrawings] = useState([])
   const [isDrawing, setIsDrawing] = useState(false)
   const [drawingMode, setDrawingMode] = useState(null)
@@ -28,6 +29,11 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
   const [newFibLevel, setNewFibLevel] = useState('')
   const [newFibColor, setNewFibColor] = useState('#f59e0b')
   const linesRef = useRef([])
+
+  // Helper to check if chart is valid
+  const isChartValid = () => {
+    return chartRef.current && isChartReady.current
+  }
 
   // Drawing tools configuration
   const drawingTools = [
@@ -78,10 +84,21 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
   useEffect(() => {
     if (!chartContainerRef.current || !data || data.length === 0) return
 
+    // Mark chart as not ready during setup
+    isChartReady.current = false
+
     // Clear previous chart
     if (chartRef.current) {
-      chartRef.current.remove()
+      try {
+        chartRef.current.remove()
+      } catch (e) {
+        // Chart already disposed
+      }
+      chartRef.current = null
     }
+
+    // Clear line refs
+    linesRef.current = []
 
     const chart = createChart(chartContainerRef.current, {
       width: chartContainerRef.current.clientWidth,
@@ -181,354 +198,399 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
     // Fit content
     chart.timeScale().fitContent()
 
-    // Redraw saved lines
-    redrawAllDrawings()
+    // Mark chart as ready
+    isChartReady.current = true
 
     return () => {
+      isChartReady.current = false
       window.removeEventListener('resize', handleResize)
-      chart.remove()
+      try {
+        chart.remove()
+      } catch (e) {
+        // Chart already disposed
+      }
     }
   }, [data, height])
 
   // Redraw all drawings when they change
   const redrawAllDrawings = useCallback(() => {
-    if (!chartRef.current) return
+    if (!isChartValid()) return
 
-    // Clear existing line series
-    linesRef.current.forEach(line => {
-      try {
-        chartRef.current.removeSeries(line)
-      } catch (e) {}
-    })
-    linesRef.current = []
+    try {
+      // Clear existing line series
+      linesRef.current.forEach(line => {
+        try {
+          if (chartRef.current) {
+            chartRef.current.removeSeries(line)
+          }
+        } catch (e) {}
+      })
+      linesRef.current = []
 
-    // Redraw all saved drawings
-    drawings.forEach(drawing => {
-      switch (drawing.type) {
-        case 'line':
-        case 'ray':
-          drawLine(drawing)
-          break
-        case 'horizontal':
-          drawHorizontalLine(drawing)
-          break
-        case 'vertical':
-          drawVerticalLine(drawing)
-          break
-        case 'fib':
-          drawFibonacci(drawing)
-          break
-        case 'rect':
-          drawRectangle(drawing)
-          break
-        case 'range':
-          drawPriceRange(drawing)
-          break
-        case 'text':
-          break
-      }
-    })
+      // Redraw all saved drawings
+      drawings.forEach(drawing => {
+        if (!isChartValid()) return
+        switch (drawing.type) {
+          case 'line':
+          case 'ray':
+            drawLine(drawing)
+            break
+          case 'horizontal':
+            drawHorizontalLine(drawing)
+            break
+          case 'vertical':
+            drawVerticalLine(drawing)
+            break
+          case 'fib':
+            drawFibonacci(drawing)
+            break
+          case 'rect':
+            drawRectangle(drawing)
+            break
+          case 'range':
+            drawPriceRange(drawing)
+            break
+          case 'text':
+            break
+        }
+      })
 
-    updateTextMarkers()
+      updateTextMarkers()
+    } catch (e) {
+      console.warn('Error redrawing:', e)
+    }
   }, [drawings, fibLevels])
 
   useEffect(() => {
-    if (chartRef.current && drawings.length >= 0) {
+    if (isChartValid() && drawings.length >= 0) {
       redrawAllDrawings()
     }
   }, [drawings, redrawAllDrawings, fibLevels])
 
   // Drawing functions
   const drawLine = (drawing) => {
-    if (!chartRef.current) return
+    if (!isChartValid()) return
 
-    const lineSeries = chartRef.current.addLineSeries({
-      color: drawing.color || '#f59e0b',
-      lineWidth: 2,
-      lineStyle: 0,
-      crosshairMarkerVisible: false,
-      lastValueVisible: false,
-      priceLineVisible: false,
-    })
-
-    let endTime = drawing.end.time
-    let endPrice = drawing.end.price
-
-    if (drawing.type === 'ray' && data.length > 0) {
-      const lastDate = data[data.length - 1].date
-      const slope = (drawing.end.price - drawing.start.price) /
-                   (new Date(drawing.end.time).getTime() - new Date(drawing.start.time).getTime())
-      const timeDiff = new Date(lastDate).getTime() - new Date(drawing.start.time).getTime()
-      endPrice = drawing.start.price + slope * timeDiff
-      endTime = lastDate
-    }
-
-    lineSeries.setData([
-      { time: drawing.start.time, value: drawing.start.price },
-      { time: endTime, value: endPrice },
-    ])
-
-    linesRef.current.push(lineSeries)
-  }
-
-  const drawHorizontalLine = (drawing) => {
-    if (!chartRef.current || !data.length) return
-
-    const lineSeries = chartRef.current.addLineSeries({
-      color: drawing.color || '#3b82f6',
-      lineWidth: 1,
-      lineStyle: 2,
-      crosshairMarkerVisible: false,
-      lastValueVisible: true,
-      priceLineVisible: false,
-    })
-
-    lineSeries.setData([
-      { time: data[0].date, value: drawing.price },
-      { time: data[data.length - 1].date, value: drawing.price },
-    ])
-
-    linesRef.current.push(lineSeries)
-  }
-
-  const drawVerticalLine = (drawing) => {
-    if (!candlestickSeriesRef.current) return
-
-    const minPrice = Math.min(...data.map(d => d.low))
-    const maxPrice = Math.max(...data.map(d => d.high))
-
-    const lineSeries = chartRef.current.addLineSeries({
-      color: drawing.color || '#8b5cf6',
-      lineWidth: 1,
-      lineStyle: 2,
-      crosshairMarkerVisible: false,
-      lastValueVisible: false,
-      priceLineVisible: false,
-    })
-
-    lineSeries.setData([
-      { time: drawing.time, value: minPrice },
-      { time: drawing.time, value: maxPrice },
-    ])
-
-    linesRef.current.push(lineSeries)
-  }
-
-  const drawFibonacci = (drawing) => {
-    if (!chartRef.current || !data.length) return
-
-    const high = Math.max(drawing.start.price, drawing.end.price)
-    const low = Math.min(drawing.start.price, drawing.end.price)
-    const range = high - low
-
-    // Use custom fib levels
-    fibLevels.forEach((fibLevel) => {
-      const price = high - (range * fibLevel.level)
-
+    try {
       const lineSeries = chartRef.current.addLineSeries({
-        color: fibLevel.color,
-        lineWidth: 1,
-        lineStyle: fibLevel.level === 0.5 ? 0 : 2,
+        color: drawing.color || '#f59e0b',
+        lineWidth: 2,
+        lineStyle: 0,
         crosshairMarkerVisible: false,
-        lastValueVisible: true,
+        lastValueVisible: false,
         priceLineVisible: false,
-        title: fibLevel.label,
       })
 
+      let endTime = drawing.end.time
+      let endPrice = drawing.end.price
+
+      if (drawing.type === 'ray' && data.length > 0) {
+        const lastDate = data[data.length - 1].date
+        const slope = (drawing.end.price - drawing.start.price) /
+                     (new Date(drawing.end.time).getTime() - new Date(drawing.start.time).getTime())
+        const timeDiff = new Date(lastDate).getTime() - new Date(drawing.start.time).getTime()
+        endPrice = drawing.start.price + slope * timeDiff
+        endTime = lastDate
+      }
+
       lineSeries.setData([
-        { time: data[0].date, value: price },
-        { time: data[data.length - 1].date, value: price },
+        { time: drawing.start.time, value: drawing.start.price },
+        { time: endTime, value: endPrice },
       ])
 
       linesRef.current.push(lineSeries)
-    })
+    } catch (e) {
+      console.warn('Error drawing line:', e)
+    }
+  }
+
+  const drawHorizontalLine = (drawing) => {
+    if (!isChartValid() || !data.length) return
+
+    try {
+      const lineSeries = chartRef.current.addLineSeries({
+        color: drawing.color || '#3b82f6',
+        lineWidth: 1,
+        lineStyle: 2,
+        crosshairMarkerVisible: false,
+        lastValueVisible: true,
+        priceLineVisible: false,
+      })
+
+      lineSeries.setData([
+        { time: data[0].date, value: drawing.price },
+        { time: data[data.length - 1].date, value: drawing.price },
+      ])
+
+      linesRef.current.push(lineSeries)
+    } catch (e) {
+      console.warn('Error drawing horizontal line:', e)
+    }
+  }
+
+  const drawVerticalLine = (drawing) => {
+    if (!isChartValid() || !candlestickSeriesRef.current) return
+
+    try {
+      const minPrice = Math.min(...data.map(d => d.low))
+      const maxPrice = Math.max(...data.map(d => d.high))
+
+      const lineSeries = chartRef.current.addLineSeries({
+        color: drawing.color || '#8b5cf6',
+        lineWidth: 1,
+        lineStyle: 2,
+        crosshairMarkerVisible: false,
+        lastValueVisible: false,
+        priceLineVisible: false,
+      })
+
+      lineSeries.setData([
+        { time: drawing.time, value: minPrice },
+        { time: drawing.time, value: maxPrice },
+      ])
+
+      linesRef.current.push(lineSeries)
+    } catch (e) {
+      console.warn('Error drawing vertical line:', e)
+    }
+  }
+
+  const drawFibonacci = (drawing) => {
+    if (!isChartValid() || !data.length) return
+
+    try {
+      const high = Math.max(drawing.start.price, drawing.end.price)
+      const low = Math.min(drawing.start.price, drawing.end.price)
+      const range = high - low
+
+      // Use custom fib levels
+      fibLevels.forEach((fibLevel) => {
+        if (!isChartValid()) return
+        const price = high - (range * fibLevel.level)
+
+        const lineSeries = chartRef.current.addLineSeries({
+          color: fibLevel.color,
+          lineWidth: 1,
+          lineStyle: fibLevel.level === 0.5 ? 0 : 2,
+          crosshairMarkerVisible: false,
+          lastValueVisible: true,
+          priceLineVisible: false,
+          title: fibLevel.label,
+        })
+
+        lineSeries.setData([
+          { time: data[0].date, value: price },
+          { time: data[data.length - 1].date, value: price },
+        ])
+
+        linesRef.current.push(lineSeries)
+      })
+    } catch (e) {
+      console.warn('Error drawing fibonacci:', e)
+    }
   }
 
   const drawRectangle = (drawing) => {
-    if (!chartRef.current) return
+    if (!isChartValid()) return
 
-    const { start, end, color = '#22c55e' } = drawing
+    try {
+      const { start, end, color = '#22c55e' } = drawing
 
-    const topLine = chartRef.current.addLineSeries({
-      color,
-      lineWidth: 2,
-      crosshairMarkerVisible: false,
-      lastValueVisible: false,
-      priceLineVisible: false,
-    })
-    topLine.setData([
-      { time: start.time, value: Math.max(start.price, end.price) },
-      { time: end.time, value: Math.max(start.price, end.price) },
-    ])
-    linesRef.current.push(topLine)
+      const topLine = chartRef.current.addLineSeries({
+        color,
+        lineWidth: 2,
+        crosshairMarkerVisible: false,
+        lastValueVisible: false,
+        priceLineVisible: false,
+      })
+      topLine.setData([
+        { time: start.time, value: Math.max(start.price, end.price) },
+        { time: end.time, value: Math.max(start.price, end.price) },
+      ])
+      linesRef.current.push(topLine)
 
-    const bottomLine = chartRef.current.addLineSeries({
-      color,
-      lineWidth: 2,
-      crosshairMarkerVisible: false,
-      lastValueVisible: false,
-      priceLineVisible: false,
-    })
-    bottomLine.setData([
-      { time: start.time, value: Math.min(start.price, end.price) },
-      { time: end.time, value: Math.min(start.price, end.price) },
-    ])
-    linesRef.current.push(bottomLine)
+      const bottomLine = chartRef.current.addLineSeries({
+        color,
+        lineWidth: 2,
+        crosshairMarkerVisible: false,
+        lastValueVisible: false,
+        priceLineVisible: false,
+      })
+      bottomLine.setData([
+        { time: start.time, value: Math.min(start.price, end.price) },
+        { time: end.time, value: Math.min(start.price, end.price) },
+      ])
+      linesRef.current.push(bottomLine)
 
-    const leftLine = chartRef.current.addLineSeries({
-      color,
-      lineWidth: 2,
-      crosshairMarkerVisible: false,
-      lastValueVisible: false,
-      priceLineVisible: false,
-    })
-    leftLine.setData([
-      { time: start.time, value: start.price },
-      { time: start.time, value: end.price },
-    ])
-    linesRef.current.push(leftLine)
+      const leftLine = chartRef.current.addLineSeries({
+        color,
+        lineWidth: 2,
+        crosshairMarkerVisible: false,
+        lastValueVisible: false,
+        priceLineVisible: false,
+      })
+      leftLine.setData([
+        { time: start.time, value: start.price },
+        { time: start.time, value: end.price },
+      ])
+      linesRef.current.push(leftLine)
 
-    const rightLine = chartRef.current.addLineSeries({
-      color,
-      lineWidth: 2,
-      crosshairMarkerVisible: false,
-      lastValueVisible: false,
-      priceLineVisible: false,
-    })
-    rightLine.setData([
-      { time: end.time, value: start.price },
-      { time: end.time, value: end.price },
-    ])
-    linesRef.current.push(rightLine)
+      const rightLine = chartRef.current.addLineSeries({
+        color,
+        lineWidth: 2,
+        crosshairMarkerVisible: false,
+        lastValueVisible: false,
+        priceLineVisible: false,
+      })
+      rightLine.setData([
+        { time: end.time, value: start.price },
+        { time: end.time, value: end.price },
+      ])
+      linesRef.current.push(rightLine)
+    } catch (e) {
+      console.warn('Error drawing rectangle:', e)
+    }
   }
 
   const drawPriceRange = (drawing) => {
-    if (!chartRef.current) return
+    if (!isChartValid()) return
 
-    const { start, end } = drawing
-    const priceDiff = end.price - start.price
+    try {
+      const { start, end } = drawing
+      const priceDiff = end.price - start.price
 
-    const lineSeries = chartRef.current.addLineSeries({
-      color: priceDiff >= 0 ? '#10b981' : '#ef4444',
-      lineWidth: 2,
-      lineStyle: 0,
-      crosshairMarkerVisible: false,
-      lastValueVisible: false,
-      priceLineVisible: false,
-    })
+      const lineSeries = chartRef.current.addLineSeries({
+        color: priceDiff >= 0 ? '#10b981' : '#ef4444',
+        lineWidth: 2,
+        lineStyle: 0,
+        crosshairMarkerVisible: false,
+        lastValueVisible: false,
+        priceLineVisible: false,
+      })
 
-    lineSeries.setData([
-      { time: start.time, value: start.price },
-      { time: end.time, value: end.price },
-    ])
+      lineSeries.setData([
+        { time: start.time, value: start.price },
+        { time: end.time, value: end.price },
+      ])
 
-    linesRef.current.push(lineSeries)
+      linesRef.current.push(lineSeries)
 
-    const startLine = chartRef.current.addLineSeries({
-      color: '#64748b',
-      lineWidth: 1,
-      lineStyle: 2,
-      crosshairMarkerVisible: false,
-      lastValueVisible: false,
-      priceLineVisible: false,
-    })
-    startLine.setData([
-      { time: start.time, value: start.price },
-      { time: end.time, value: start.price },
-    ])
-    linesRef.current.push(startLine)
+      const startLine = chartRef.current.addLineSeries({
+        color: '#64748b',
+        lineWidth: 1,
+        lineStyle: 2,
+        crosshairMarkerVisible: false,
+        lastValueVisible: false,
+        priceLineVisible: false,
+      })
+      startLine.setData([
+        { time: start.time, value: start.price },
+        { time: end.time, value: start.price },
+      ])
+      linesRef.current.push(startLine)
 
-    const endLine = chartRef.current.addLineSeries({
-      color: '#64748b',
-      lineWidth: 1,
-      lineStyle: 2,
-      crosshairMarkerVisible: false,
-      lastValueVisible: false,
-      priceLineVisible: false,
-    })
-    endLine.setData([
-      { time: start.time, value: end.price },
-      { time: end.time, value: end.price },
-    ])
-    linesRef.current.push(endLine)
+      const endLine = chartRef.current.addLineSeries({
+        color: '#64748b',
+        lineWidth: 1,
+        lineStyle: 2,
+        crosshairMarkerVisible: false,
+        lastValueVisible: false,
+        priceLineVisible: false,
+      })
+      endLine.setData([
+        { time: start.time, value: end.price },
+        { time: end.time, value: end.price },
+      ])
+      linesRef.current.push(endLine)
+    } catch (e) {
+      console.warn('Error drawing price range:', e)
+    }
   }
 
   const updateTextMarkers = () => {
-    if (!candlestickSeriesRef.current) return
+    if (!isChartValid() || !candlestickSeriesRef.current) return
 
-    const textDrawings = drawings.filter(d => d.type === 'text')
-    const markers = textDrawings.map(d => ({
-      time: d.time,
-      position: 'aboveBar',
-      color: d.color || '#f59e0b',
-      shape: 'text',
-      text: d.text,
-    }))
+    try {
+      const textDrawings = drawings.filter(d => d.type === 'text')
+      const markers = textDrawings.map(d => ({
+        time: d.time,
+        position: 'aboveBar',
+        color: d.color || '#f59e0b',
+        shape: 'text',
+        text: d.text,
+      }))
 
-    candlestickSeriesRef.current.setMarkers(markers)
+      candlestickSeriesRef.current.setMarkers(markers)
+    } catch (e) {
+      console.warn('Error updating text markers:', e)
+    }
   }
 
   // Handle chart click for drawing
   const handleChartClick = (e) => {
-    if (!drawingMode || !chartRef.current || !candlestickSeriesRef.current) return
+    if (!drawingMode || !isChartValid() || !candlestickSeriesRef.current) return
 
-    const rect = chartContainerRef.current.getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
+    try {
+      const rect = chartContainerRef.current.getBoundingClientRect()
+      const x = e.clientX - rect.left
+      const y = e.clientY - rect.top
 
-    const timeScale = chartRef.current.timeScale()
-    const time = timeScale.coordinateToTime(x)
-    const price = candlestickSeriesRef.current.coordinateToPrice(y)
+      const timeScale = chartRef.current.timeScale()
+      const time = timeScale.coordinateToTime(x)
+      const price = candlestickSeriesRef.current.coordinateToPrice(y)
 
-    if (!time || !price) return
+      if (!time || !price) return
 
-    if (drawingMode === 'text') {
-      setPendingTextPoint({ time, price })
-      setShowTextModal(true)
-      return
-    }
-
-    if (drawingMode === 'vertical') {
-      const newDrawing = {
-        id: Date.now(),
-        type: 'vertical',
-        time,
-        color: '#8b5cf6',
-      }
-      setDrawings(prev => [...prev, newDrawing])
-      setDrawingMode(null)
-      setIsDrawing(false)
-      return
-    }
-
-    if (drawingMode === 'horizontal') {
-      const newDrawing = {
-        id: Date.now(),
-        type: 'horizontal',
-        price,
-        color: '#3b82f6',
-      }
-      setDrawings(prev => [...prev, newDrawing])
-      setDrawingMode(null)
-      setIsDrawing(false)
-      return
-    }
-
-    if (!startPoint) {
-      setStartPoint({ time, price })
-    } else {
-      const newDrawing = {
-        id: Date.now(),
-        type: drawingMode,
-        start: startPoint,
-        end: { time, price },
-        color: getDrawingColor(drawingMode),
+      if (drawingMode === 'text') {
+        setPendingTextPoint({ time, price })
+        setShowTextModal(true)
+        return
       }
 
-      setDrawings(prev => [...prev, newDrawing])
-      setStartPoint(null)
-      setDrawingMode(null)
-      setIsDrawing(false)
+      if (drawingMode === 'vertical') {
+        const newDrawing = {
+          id: Date.now(),
+          type: 'vertical',
+          time,
+          color: '#8b5cf6',
+        }
+        setDrawings(prev => [...prev, newDrawing])
+        setDrawingMode(null)
+        setIsDrawing(false)
+        return
+      }
+
+      if (drawingMode === 'horizontal') {
+        const newDrawing = {
+          id: Date.now(),
+          type: 'horizontal',
+          price,
+          color: '#3b82f6',
+        }
+        setDrawings(prev => [...prev, newDrawing])
+        setDrawingMode(null)
+        setIsDrawing(false)
+        return
+      }
+
+      if (!startPoint) {
+        setStartPoint({ time, price })
+      } else {
+        const newDrawing = {
+          id: Date.now(),
+          type: drawingMode,
+          start: startPoint,
+          end: { time, price },
+          color: getDrawingColor(drawingMode),
+        }
+
+        setDrawings(prev => [...prev, newDrawing])
+        setStartPoint(null)
+        setDrawingMode(null)
+        setIsDrawing(false)
+      }
+    } catch (e) {
+      console.warn('Error handling chart click:', e)
     }
   }
 
