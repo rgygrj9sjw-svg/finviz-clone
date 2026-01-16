@@ -33,7 +33,6 @@ export default function Screener() {
 
   useEffect(() => {
     fetchStocks()
-    // Refresh every 60 seconds
     const interval = setInterval(fetchStocks, 60000)
     return () => clearInterval(interval)
   }, [])
@@ -69,120 +68,208 @@ export default function Screener() {
     }))
   }
 
+  // Stats
+  const gainers = stocks.filter(s => s.changePercent > 0).length
+  const losers = stocks.filter(s => s.changePercent < 0).length
+  const avgChange = stocks.length
+    ? stocks.reduce((sum, s) => sum + (s.changePercent || 0), 0) / stocks.length
+    : 0
+
   return (
     <Layout>
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold">Stock Screener</h1>
+      <div className="space-y-6 animate-fadeIn">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-white">Stock Screener</h1>
+            <p className="text-slate-400 text-sm">Real-time market data powered by Yahoo Finance</p>
+          </div>
           <div className="flex items-center gap-3">
             {lastUpdate && (
-              <span className="text-xs text-gray-500">Updated: {lastUpdate}</span>
+              <span className="text-xs text-slate-500">Updated: {lastUpdate}</span>
             )}
-            <button
-              onClick={fetchStocks}
-              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm"
-            >
-              Refresh
+            <button onClick={fetchStocks} className="btn-primary flex items-center gap-2">
+              <span>🔄</span>
+              <span>Refresh</span>
             </button>
           </div>
         </div>
 
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="stat-card stat-neutral">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs text-slate-400 uppercase tracking-wide">Total Stocks</div>
+                <div className="text-3xl font-bold text-white">{stocks.length}</div>
+              </div>
+              <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center">
+                <span className="text-2xl">📊</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="stat-card stat-up">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs text-slate-400 uppercase tracking-wide">Gainers</div>
+                <div className="text-3xl font-bold text-emerald-400">{gainers}</div>
+              </div>
+              <div className="w-12 h-12 bg-emerald-500/20 rounded-xl flex items-center justify-center">
+                <span className="text-2xl">📈</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="stat-card stat-down">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs text-slate-400 uppercase tracking-wide">Losers</div>
+                <div className="text-3xl font-bold text-red-400">{losers}</div>
+              </div>
+              <div className="w-12 h-12 bg-red-500/20 rounded-xl flex items-center justify-center">
+                <span className="text-2xl">📉</span>
+              </div>
+            </div>
+          </div>
+
+          <div className={`stat-card ${avgChange >= 0 ? 'stat-up' : 'stat-down'}`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs text-slate-400 uppercase tracking-wide">Avg Change</div>
+                <div className={`text-3xl font-bold ${avgChange >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {avgChange >= 0 ? '+' : ''}{avgChange.toFixed(2)}%
+                </div>
+              </div>
+              <div className={`w-12 h-12 ${avgChange >= 0 ? 'bg-emerald-500/20' : 'bg-red-500/20'} rounded-xl flex items-center justify-center`}>
+                <span className="text-2xl">{avgChange >= 0 ? '🚀' : '⚠️'}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Filters */}
-        <div className="bg-gray-900 p-4 rounded-lg mb-4 flex flex-wrap gap-4">
-          <div>
-            <label className="block text-xs text-gray-400 mb-1">Sector</label>
-            <select
-              value={filters.sector}
-              onChange={(e) => setFilters({...filters, sector: e.target.value})}
-              className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm"
+        <div className="card p-4">
+          <div className="flex flex-wrap gap-4 items-end">
+            <div>
+              <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wide">Sector</label>
+              <select
+                value={filters.sector}
+                onChange={(e) => setFilters({...filters, sector: e.target.value})}
+                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+              >
+                {SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wide">Min Price</label>
+              <input
+                type="number"
+                value={filters.minPrice}
+                onChange={(e) => setFilters({...filters, minPrice: e.target.value})}
+                placeholder="$0"
+                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm w-24 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wide">Max Price</label>
+              <input
+                type="number"
+                value={filters.maxPrice}
+                onChange={(e) => setFilters({...filters, maxPrice: e.target.value})}
+                placeholder="Any"
+                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm w-24 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wide">Min Change %</label>
+              <input
+                type="number"
+                value={filters.minChange}
+                onChange={(e) => setFilters({...filters, minChange: e.target.value})}
+                placeholder="Any"
+                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm w-24 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+              />
+            </div>
+            <button
+              onClick={() => setFilters({ sector: 'All', minPrice: '', maxPrice: '', minChange: '', sortBy: 'changePercent', sortDir: 'desc' })}
+              className="text-sm text-slate-400 hover:text-white transition-colors"
             >
-              {SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs text-gray-400 mb-1">Min Price</label>
-            <input
-              type="number"
-              value={filters.minPrice}
-              onChange={(e) => setFilters({...filters, minPrice: e.target.value})}
-              placeholder="0"
-              className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm w-24"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-400 mb-1">Max Price</label>
-            <input
-              type="number"
-              value={filters.maxPrice}
-              onChange={(e) => setFilters({...filters, maxPrice: e.target.value})}
-              placeholder="Any"
-              className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm w-24"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-400 mb-1">Min Change %</label>
-            <input
-              type="number"
-              value={filters.minChange}
-              onChange={(e) => setFilters({...filters, minChange: e.target.value})}
-              placeholder="Any"
-              className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm w-24"
-            />
+              Clear filters
+            </button>
           </div>
         </div>
 
         {/* Table */}
         {loading ? (
-          <div className="bg-gray-900 rounded-lg p-8 text-center">
-            <div className="animate-pulse text-gray-400">Loading real-time data...</div>
+          <div className="card p-12 text-center">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              <span className="text-slate-400">Loading real-time data...</span>
+            </div>
           </div>
         ) : (
-          <div className="bg-gray-900 rounded-lg overflow-hidden">
+          <div className="card overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-gray-800">
-                <tr>
-                  <th className="text-left p-3 font-medium">Symbol</th>
-                  <th className="text-left p-3 font-medium">Company</th>
-                  <th className="text-right p-3 font-medium cursor-pointer hover:text-green-400" onClick={() => handleSort('price')}>
+              <thead>
+                <tr className="bg-slate-800/50 border-b border-slate-700">
+                  <th className="text-left p-4 font-medium text-slate-300">Symbol</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Company</th>
+                  <th className="text-right p-4 font-medium text-slate-300 cursor-pointer hover:text-blue-400 transition-colors" onClick={() => handleSort('price')}>
                     Price {filters.sortBy === 'price' && (filters.sortDir === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th className="text-right p-3 font-medium cursor-pointer hover:text-green-400" onClick={() => handleSort('changePercent')}>
+                  <th className="text-right p-4 font-medium text-slate-300 cursor-pointer hover:text-blue-400 transition-colors" onClick={() => handleSort('changePercent')}>
                     Change % {filters.sortBy === 'changePercent' && (filters.sortDir === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th className="text-right p-3 font-medium">Change $</th>
-                  <th className="text-right p-3 font-medium cursor-pointer hover:text-green-400" onClick={() => handleSort('volume')}>
+                  <th className="text-right p-4 font-medium text-slate-300">Change $</th>
+                  <th className="text-right p-4 font-medium text-slate-300 cursor-pointer hover:text-blue-400 transition-colors" onClick={() => handleSort('volume')}>
                     Volume {filters.sortBy === 'volume' && (filters.sortDir === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th className="text-right p-3 font-medium">High</th>
-                  <th className="text-right p-3 font-medium">Low</th>
-                  <th className="text-left p-3 font-medium">Sector</th>
+                  <th className="text-left p-4 font-medium text-slate-300">Sector</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredStocks.map(stock => (
-                  <tr key={stock.symbol} className="border-t border-gray-800 hover:bg-gray-800/50">
-                    <td className="p-3 font-medium text-blue-400">{stock.symbol}</td>
-                    <td className="p-3 text-gray-300">{stock.name}</td>
-                    <td className="p-3 text-right font-medium">${stock.price?.toFixed(2) || '-'}</td>
-                    <td className={`p-3 text-right font-medium ${(stock.changePercent || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {stock.changePercent ? `${stock.changePercent >= 0 ? '+' : ''}${stock.changePercent.toFixed(2)}%` : '-'}
+                {filteredStocks.map((stock, i) => (
+                  <tr
+                    key={stock.symbol}
+                    className="border-t border-slate-800 hover:bg-slate-800/50 transition-colors"
+                    style={{ animationDelay: `${i * 30}ms` }}
+                  >
+                    <td className="p-4">
+                      <span className="font-bold text-blue-400">{stock.symbol}</span>
                     </td>
-                    <td className={`p-3 text-right ${(stock.change || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {stock.change ? `${stock.change >= 0 ? '+' : ''}$${stock.change.toFixed(2)}` : '-'}
+                    <td className="p-4 text-slate-300">{stock.name}</td>
+                    <td className="p-4 text-right font-medium text-white">
+                      ${stock.price?.toFixed(2) || '-'}
                     </td>
-                    <td className="p-3 text-right text-gray-300">{formatNumber(stock.volume)}</td>
-                    <td className="p-3 text-right text-gray-300">${stock.high?.toFixed(2) || '-'}</td>
-                    <td className="p-3 text-right text-gray-300">${stock.low?.toFixed(2) || '-'}</td>
-                    <td className="p-3 text-gray-400">{stock.sector}</td>
+                    <td className="p-4 text-right">
+                      <span className={`badge ${
+                        (stock.changePercent || 0) >= 2 ? 'badge-success' :
+                        (stock.changePercent || 0) >= 0 ? 'badge-success' :
+                        (stock.changePercent || 0) >= -2 ? 'badge-danger' : 'badge-danger'
+                      }`}>
+                        {stock.changePercent ? `${stock.changePercent >= 0 ? '+' : ''}${stock.changePercent.toFixed(2)}%` : '-'}
+                      </span>
+                    </td>
+                    <td className={`p-4 text-right font-medium ${(stock.change || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {stock.change ? `${stock.change >= 0 ? '+' : ''}$${Math.abs(stock.change).toFixed(2)}` : '-'}
+                    </td>
+                    <td className="p-4 text-right text-slate-400">{formatNumber(stock.volume)}</td>
+                    <td className="p-4">
+                      <span className="text-xs text-slate-500 bg-slate-800 px-2 py-1 rounded">
+                        {stock.sector}
+                      </span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
-        <p className="text-xs text-gray-500 mt-2">
+
+        <p className="text-xs text-slate-500">
           {filteredStocks.length} stocks found
-          {stocks.length === 0 && !loading && ' • Add API keys to .env.local for real data'}
+          {stocks.length === 0 && !loading && ' • Waiting for data...'}
         </p>
       </div>
     </Layout>

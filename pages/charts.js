@@ -1,7 +1,15 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import Layout from '../components/Layout'
+import ProChart from '../components/ProChart'
 
 const STOCKS = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'JPM', 'V', 'XOM']
+const TIMEFRAMES = [
+  { label: '1W', days: 7 },
+  { label: '1M', days: 30 },
+  { label: '3M', days: 90 },
+  { label: '6M', days: 180 },
+  { label: '1Y', days: 365 },
+]
 
 export default function Charts() {
   const [selectedStock, setSelectedStock] = useState('AAPL')
@@ -9,27 +17,23 @@ export default function Charts() {
   const [priceData, setPriceData] = useState([])
   const [loading, setLoading] = useState(true)
   const [quote, setQuote] = useState(null)
-  const canvasRef = useRef(null)
 
   const fetchData = async () => {
     setLoading(true)
     try {
-      const days = timeframe === '1W' ? 7 : timeframe === '1M' ? 30 : timeframe === '3M' ? 90 : 365
+      const tf = TIMEFRAMES.find(t => t.label === timeframe)
+      const res = await fetch(`/api/history?symbol=${selectedStock}&days=${tf?.days || 90}`)
+      const data = await res.json()
 
-      // Fetch historical data
-      const histRes = await fetch(`/api/history?symbol=${selectedStock}&days=${days}`)
-      const histData = await histRes.json()
-
-      if (histData.history) {
-        setPriceData(histData.history)
-      }
-
-      // Fetch current quote
-      const quoteRes = await fetch('/api/stocks')
-      const quoteData = await quoteRes.json()
-      const stockQuote = quoteData.stocks?.find(s => s.symbol === selectedStock)
-      if (stockQuote) {
-        setQuote(stockQuote)
+      if (data.history) {
+        setPriceData(data.history.map(d => ({
+          date: d.date,
+          open: d.open,
+          high: d.high,
+          low: d.low,
+          close: d.close,
+          volume: d.volume
+        })))
       }
     } catch (error) {
       console.error('Failed to fetch chart data:', error)
@@ -42,88 +46,38 @@ export default function Charts() {
     fetchData()
   }, [selectedStock, timeframe])
 
-  useEffect(() => {
-    if (!canvasRef.current || priceData.length === 0) return
-
-    const canvas = canvasRef.current
-    const ctx = canvas.getContext('2d')
-    const width = canvas.width
-    const height = canvas.height
-
-    // Clear canvas
-    ctx.fillStyle = '#111'
-    ctx.fillRect(0, 0, width, height)
-
-    const prices = priceData.map(d => d.close)
-    const minPrice = Math.min(...prices) * 0.98
-    const maxPrice = Math.max(...prices) * 1.02
-    const priceRange = maxPrice - minPrice
-
-    // Draw grid
-    ctx.strokeStyle = '#333'
-    ctx.lineWidth = 1
-    for (let i = 0; i <= 4; i++) {
-      const y = (height * i) / 4
-      ctx.beginPath()
-      ctx.moveTo(0, y)
-      ctx.lineTo(width, y)
-      ctx.stroke()
-
-      // Price labels
-      const price = maxPrice - (priceRange * i) / 4
-      ctx.fillStyle = '#666'
-      ctx.font = '11px sans-serif'
-      ctx.fillText('$' + price.toFixed(2), 5, y + 12)
-    }
-
-    // Draw price line
-    const isUp = prices[prices.length - 1] >= prices[0]
-    ctx.strokeStyle = isUp ? '#22c55e' : '#ef4444'
-    ctx.lineWidth = 2
-    ctx.beginPath()
-
-    priceData.forEach((point, i) => {
-      const x = (i / (priceData.length - 1)) * width
-      const y = height - ((point.close - minPrice) / priceRange) * height
-      if (i === 0) ctx.moveTo(x, y)
-      else ctx.lineTo(x, y)
-    })
-    ctx.stroke()
-
-    // Fill area under line
-    const gradient = ctx.createLinearGradient(0, 0, 0, height)
-    const color = isUp ? '34, 197, 94' : '239, 68, 68'
-    gradient.addColorStop(0, `rgba(${color}, 0.3)`)
-    gradient.addColorStop(1, `rgba(${color}, 0)`)
-
-    ctx.fillStyle = gradient
-    ctx.lineTo(width, height)
-    ctx.lineTo(0, height)
-    ctx.closePath()
-    ctx.fill()
-
-  }, [priceData])
-
-  const startPrice = priceData[0]?.close || 0
-  const endPrice = priceData[priceData.length - 1]?.close || 0
-  const periodChange = endPrice - startPrice
-  const periodChangePercent = startPrice ? ((periodChange / startPrice) * 100) : 0
+  // Calculate stats
+  const firstPrice = priceData[0]?.close || 0
+  const lastPrice = priceData[priceData.length - 1]?.close || 0
+  const change = lastPrice - firstPrice
+  const changePercent = firstPrice ? (change / firstPrice) * 100 : 0
+  const highPrice = Math.max(...priceData.map(d => d.high || 0))
+  const lowPrice = Math.min(...priceData.filter(d => d.low).map(d => d.low))
+  const avgVolume = priceData.length
+    ? priceData.reduce((sum, d) => sum + (d.volume || 0), 0) / priceData.length
+    : 0
 
   return (
     <Layout>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-4">Stock Charts</h1>
+      <div className="space-y-6 animate-fadeIn">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-white">Charts</h1>
+            <p className="text-slate-400 text-sm">Professional candlestick charts with real-time data</p>
+          </div>
+        </div>
 
         {/* Stock Selector */}
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div className="flex flex-wrap gap-2">
           {STOCKS.map(symbol => (
             <button
               key={symbol}
               onClick={() => setSelectedStock(symbol)}
-              className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                 selectedStock === symbol
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
               }`}
             >
               {symbol}
@@ -131,108 +85,89 @@ export default function Charts() {
           ))}
         </div>
 
-        {/* Chart Container */}
-        <div className="bg-gray-900 rounded-lg p-4">
-          {/* Header */}
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <h2 className="text-xl font-bold">{selectedStock}</h2>
-              <p className="text-gray-400 text-sm">{quote?.name || 'Loading...'}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-2xl font-bold">
-                ${quote?.price?.toFixed(2) || endPrice.toFixed(2)}
-              </p>
-              <p className={`text-sm font-medium ${periodChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {periodChange >= 0 ? '+' : ''}{periodChange.toFixed(2)} ({periodChangePercent >= 0 ? '+' : ''}{periodChangePercent.toFixed(2)}%)
-                <span className="text-gray-500 ml-1">({timeframe})</span>
-              </p>
-            </div>
-          </div>
-
-          {/* Timeframe Selector */}
-          <div className="flex gap-2 mb-4">
-            {['1W', '1M', '3M', '1Y'].map(tf => (
-              <button
-                key={tf}
-                onClick={() => setTimeframe(tf)}
-                className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-                  timeframe === tf
-                    ? 'bg-gray-700 text-white'
-                    : 'bg-gray-800 text-gray-400 hover:text-white'
-                }`}
-              >
-                {tf}
-              </button>
-            ))}
-          </div>
-
-          {/* Chart Canvas */}
+        {/* Main Chart */}
+        <div className="card p-0 overflow-hidden">
           {loading ? (
-            <div className="w-full h-64 md:h-80 flex items-center justify-center bg-gray-800 rounded">
-              <div className="animate-pulse text-gray-400">Loading chart data...</div>
+            <div className="h-[500px] flex items-center justify-center bg-slate-900">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                <span className="text-slate-400">Loading chart data...</span>
+              </div>
             </div>
           ) : priceData.length > 0 ? (
-            <canvas
-              ref={canvasRef}
-              width={800}
-              height={400}
-              className="w-full h-64 md:h-80 rounded"
-            />
+            <ProChart data={priceData} symbol={selectedStock} height={450} />
           ) : (
-            <div className="w-full h-64 md:h-80 flex items-center justify-center bg-gray-800 rounded">
-              <div className="text-gray-400">No data available. Add API keys to .env.local</div>
+            <div className="h-[500px] flex items-center justify-center bg-slate-900">
+              <span className="text-slate-400">No data available</span>
             </div>
-          )}
-
-          {/* Volume bars */}
-          {priceData.length > 0 && (
-            <>
-              <div className="flex items-end h-16 gap-px mt-2">
-                {priceData.slice(-50).map((point, i) => {
-                  const maxVol = Math.max(...priceData.slice(-50).map(p => p.volume || 0))
-                  return (
-                    <div
-                      key={i}
-                      className="flex-1 bg-gray-700 rounded-t"
-                      style={{ height: `${maxVol ? (point.volume / maxVol) * 100 : 0}%` }}
-                      title={`Volume: ${((point.volume || 0) / 1000000).toFixed(1)}M`}
-                    />
-                  )
-                })}
-              </div>
-              <p className="text-xs text-gray-500 mt-1">Volume</p>
-            </>
           )}
         </div>
 
-        {/* Stats */}
+        {/* Timeframe Selector */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-slate-500 mr-2">Timeframe:</span>
+          {TIMEFRAMES.map(tf => (
+            <button
+              key={tf.label}
+              onClick={() => setTimeframe(tf.label)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                timeframe === tf.label
+                  ? 'bg-slate-700 text-white'
+                  : 'bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              {tf.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Stats Grid */}
         {priceData.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-            <div className="bg-gray-900 rounded-lg p-4">
-              <p className="text-gray-400 text-xs">Open</p>
-              <p className="text-lg font-medium">${priceData[0]?.open?.toFixed(2) || '-'}</p>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className={`stat-card ${changePercent >= 0 ? 'stat-up' : 'stat-down'}`}>
+              <div className="text-xs text-slate-400 uppercase tracking-wide">Change ({timeframe})</div>
+              <div className={`text-2xl font-bold ${changePercent >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                {changePercent >= 0 ? '+' : ''}{changePercent.toFixed(2)}%
+              </div>
+              <div className="text-sm text-slate-500">
+                {change >= 0 ? '+' : ''}${change.toFixed(2)}
+              </div>
             </div>
-            <div className="bg-gray-900 rounded-lg p-4">
-              <p className="text-gray-400 text-xs">High ({timeframe})</p>
-              <p className="text-lg font-medium text-green-400">
-                ${Math.max(...priceData.map(d => d.high || 0)).toFixed(2)}
-              </p>
+
+            <div className="stat-card stat-neutral">
+              <div className="text-xs text-slate-400 uppercase tracking-wide">Period High</div>
+              <div className="text-2xl font-bold text-emerald-400">${highPrice.toFixed(2)}</div>
+              <div className="text-sm text-slate-500">Highest point</div>
             </div>
-            <div className="bg-gray-900 rounded-lg p-4">
-              <p className="text-gray-400 text-xs">Low ({timeframe})</p>
-              <p className="text-lg font-medium text-red-400">
-                ${Math.min(...priceData.map(d => d.low || Infinity)).toFixed(2)}
-              </p>
+
+            <div className="stat-card stat-neutral">
+              <div className="text-xs text-slate-400 uppercase tracking-wide">Period Low</div>
+              <div className="text-2xl font-bold text-red-400">${lowPrice.toFixed(2)}</div>
+              <div className="text-sm text-slate-500">Lowest point</div>
             </div>
-            <div className="bg-gray-900 rounded-lg p-4">
-              <p className="text-gray-400 text-xs">Avg Volume</p>
-              <p className="text-lg font-medium">
-                {(priceData.reduce((a, b) => a + (b.volume || 0), 0) / priceData.length / 1000000).toFixed(1)}M
-              </p>
+
+            <div className="stat-card stat-neutral">
+              <div className="text-xs text-slate-400 uppercase tracking-wide">Range</div>
+              <div className="text-2xl font-bold text-white">${(highPrice - lowPrice).toFixed(2)}</div>
+              <div className="text-sm text-slate-500">High - Low</div>
+            </div>
+
+            <div className="stat-card stat-neutral">
+              <div className="text-xs text-slate-400 uppercase tracking-wide">Avg Volume</div>
+              <div className="text-2xl font-bold text-white">{(avgVolume / 1000000).toFixed(2)}M</div>
+              <div className="text-sm text-slate-500">Daily average</div>
             </div>
           </div>
         )}
+
+        {/* Achievement Toast */}
+        <div className="fixed bottom-4 right-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-3 rounded-lg shadow-2xl animate-slideUp flex items-center gap-3">
+          <span className="text-2xl">🏆</span>
+          <div>
+            <div className="font-bold">Chart Explorer!</div>
+            <div className="text-sm text-purple-200">Viewed 5 different stocks</div>
+          </div>
+        </div>
       </div>
     </Layout>
   )

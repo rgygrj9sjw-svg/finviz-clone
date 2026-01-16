@@ -2,14 +2,46 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* Primary - Blue (Trust & Stability) - 60% */
+  --primary-50: #eff6ff;
+  --primary-100: #dbeafe;
+  --primary-200: #bfdbfe;
+  --primary-500: #3b82f6;
+  --primary-600: #2563eb;
+  --primary-700: #1d4ed8;
+  --primary-900: #1e3a5f;
+
+  /* Secondary - Slate/Neutral - 30% */
+  --secondary-50: #f8fafc;
+  --secondary-100: #f1f5f9;
+  --secondary-200: #e2e8f0;
+  --secondary-700: #334155;
+  --secondary-800: #1e293b;
+  --secondary-900: #0f172a;
+
+  /* Accent Colors - 10% */
+  --success: #10b981;
+  --success-light: #d1fae5;
+  --warning: #f59e0b;
+  --warning-light: #fef3c7;
+  --danger: #ef4444;
+  --danger-light: #fee2e2;
+
+  /* XP/Gamification */
+  --xp-gold: #fbbf24;
+  --xp-purple: #8b5cf6;
+}
+
 * {
   box-sizing: border-box;
 }
 
 body {
-  background-color: #0a0a0a;
-  color: #ffffff;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: linear-gradient(135deg, var(--secondary-900) 0%, var(--primary-900) 100%);
+  color: #f1f5f9;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  min-height: 100vh;
 }
 
 /* Custom scrollbar */
@@ -19,14 +51,189 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #1a1a1a;
+  background: var(--secondary-800);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #333;
+  background: var(--primary-600);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #444;
+  background: var(--primary-500);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 5px rgba(59, 130, 246, 0.5); }
+  50% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.8); }
+}
+
+@keyframes confetti {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(-100px) rotate(720deg); opacity: 0; }
+}
+
+@keyframes progress-shine {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}
+
+@keyframes badge-pop {
+  0% { transform: scale(0); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-slideUp {
+  animation: slideUp 0.4s ease-out;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s infinite;
+}
+
+.animate-badge-pop {
+  animation: badge-pop 0.5s ease-out;
+}
+
+/* Card styles */
+.card {
+  @apply bg-slate-800/80 backdrop-blur-sm border border-slate-700/50 rounded-xl shadow-lg;
+  transition: all 0.2s ease;
+}
+
+.card:hover {
+  @apply border-blue-500/30 shadow-blue-500/10;
+  transform: translateY(-2px);
+}
+
+/* Button styles */
+.btn-primary {
+  @apply px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-medium rounded-lg transition-all duration-200;
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.btn-success {
+  @apply px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-medium rounded-lg transition-all duration-200;
+}
+
+.btn-danger {
+  @apply px-4 py-2 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-medium rounded-lg transition-all duration-200;
+}
+
+/* Status badges */
+.badge {
+  @apply px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide;
+}
+
+.badge-success {
+  @apply bg-emerald-500/20 text-emerald-400 border border-emerald-500/30;
+}
+
+.badge-warning {
+  @apply bg-amber-500/20 text-amber-400 border border-amber-500/30;
+}
+
+.badge-danger {
+  @apply bg-red-500/20 text-red-400 border border-red-500/30;
+}
+
+.badge-info {
+  @apply bg-blue-500/20 text-blue-400 border border-blue-500/30;
+}
+
+/* Progress bar */
+.progress-bar {
+  @apply h-2 bg-slate-700 rounded-full overflow-hidden relative;
+}
+
+.progress-bar-fill {
+  @apply h-full rounded-full transition-all duration-500 relative overflow-hidden;
+}
+
+.progress-bar-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  animation: progress-shine 2s infinite;
+}
+
+/* Stat cards */
+.stat-card {
+  @apply p-4 rounded-xl bg-gradient-to-br border transition-all duration-200;
+}
+
+.stat-card:hover {
+  transform: scale(1.02);
+}
+
+.stat-up {
+  @apply from-emerald-900/50 to-emerald-800/30 border-emerald-500/30;
+}
+
+.stat-down {
+  @apply from-red-900/50 to-red-800/30 border-red-500/30;
+}
+
+.stat-neutral {
+  @apply from-slate-800/50 to-slate-700/30 border-slate-600/30;
+}
+
+/* Toast notifications */
+.toast {
+  @apply fixed bottom-4 right-4 px-4 py-3 rounded-lg shadow-2xl z-50;
+  animation: slideUp 0.3s ease-out;
+}
+
+.toast-success {
+  @apply bg-emerald-600 text-white;
+}
+
+.toast-warning {
+  @apply bg-amber-500 text-black;
+}
+
+.toast-danger {
+  @apply bg-red-600 text-white;
+}
+
+/* XP/Gamification */
+.xp-bar {
+  @apply h-3 bg-slate-700 rounded-full overflow-hidden;
+}
+
+.xp-fill {
+  @apply h-full bg-gradient-to-r from-amber-500 to-yellow-400 rounded-full transition-all duration-700;
+}
+
+.level-badge {
+  @apply inline-flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full text-sm font-bold;
+}
+
+/* Chart container */
+.chart-container {
+  @apply bg-slate-900 rounded-xl border border-slate-700 overflow-hidden;
 }
