@@ -9,6 +9,7 @@ export default function Navigation() {
     { href: '/heatmap', label: 'Heat Map' },
     { href: '/charts', label: 'Charts' },
     { href: '/news', label: 'News' },
+    { href: '/ict', label: 'ICT Scanner' },
   ]
 
   return (
