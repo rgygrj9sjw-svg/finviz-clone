@@ -126,9 +126,21 @@ export default async function handler(req, res) {
       filteredPatterns = allPatterns.filter(p => p.direction === 'bearish')
     }
 
-    // Sort by score and get top results
+    // Sort by score
     filteredPatterns.sort((a, b) => (b.score || 0) - (a.score || 0))
-    const topPatterns = filteredPatterns.slice(0, limit)
+
+    // Get best pattern per stock (unique stocks)
+    const seenStocks = new Set()
+    const uniqueStockPatterns = []
+    for (const pattern of filteredPatterns) {
+      if (!seenStocks.has(pattern.symbol)) {
+        seenStocks.add(pattern.symbol)
+        uniqueStockPatterns.push(pattern)
+      }
+    }
+
+    // Return top N unique stocks
+    const topPatterns = uniqueStockPatterns.slice(0, limit)
 
     // Generate summary
     const bullishCount = topPatterns.filter(p => p.direction === 'bullish').length
