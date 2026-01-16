@@ -1,17 +1,35 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { createChart, CrosshairMode } from 'lightweight-charts'
+
+// Fibonacci levels
+const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1]
+const FIB_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ef4444']
 
 export default function TradingChart({ data, symbol, height = 500, onAIAnalysis }) {
   const chartContainerRef = useRef(null)
   const chartRef = useRef(null)
   const candlestickSeriesRef = useRef(null)
-  const volumeSeriesRef = useRef(null)
   const [drawings, setDrawings] = useState([])
   const [isDrawing, setIsDrawing] = useState(false)
-  const [drawingMode, setDrawingMode] = useState(null) // 'line', 'horizontal', 'ray'
+  const [drawingMode, setDrawingMode] = useState(null)
   const [startPoint, setStartPoint] = useState(null)
-  const [currentLine, setCurrentLine] = useState(null)
+  const [textInput, setTextInput] = useState('')
+  const [showTextModal, setShowTextModal] = useState(false)
+  const [pendingTextPoint, setPendingTextPoint] = useState(null)
   const linesRef = useRef([])
+  const markersRef = useRef([])
+
+  // Drawing tools configuration
+  const drawingTools = [
+    { id: 'line', icon: '📏', label: 'Trend Line', description: 'Draw diagonal trend lines' },
+    { id: 'horizontal', icon: '➖', label: 'H-Line', description: 'Horizontal price level' },
+    { id: 'vertical', icon: '|', label: 'V-Line', description: 'Vertical time marker' },
+    { id: 'ray', icon: '↗️', label: 'Ray', description: 'Line extending to infinity' },
+    { id: 'fib', icon: '🔢', label: 'Fibonacci', description: 'Fibonacci retracement levels' },
+    { id: 'rect', icon: '⬜', label: 'Rectangle', description: 'Price zone box' },
+    { id: 'range', icon: '📊', label: 'Price Range', description: 'Measure price movement' },
+    { id: 'text', icon: '💬', label: 'Text', description: 'Add text annotation' },
+  ]
 
   // Load saved drawings from localStorage
   useEffect(() => {
@@ -119,8 +137,6 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
       },
     })
 
-    volumeSeriesRef.current = volumeSeries
-
     const volumeData = data.map(d => ({
       time: d.date,
       value: d.volume,
@@ -142,7 +158,7 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
     chart.timeScale().fitContent()
 
     // Redraw saved lines
-    redrawLines()
+    redrawAllDrawings()
 
     return () => {
       window.removeEventListener('resize', handleResize)
@@ -150,45 +166,296 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
     }
   }, [data, height])
 
-  // Redraw lines when drawings change
-  const redrawLines = () => {
+  // Redraw all drawings when they change
+  const redrawAllDrawings = useCallback(() => {
+    if (!chartRef.current) return
+
     // Clear existing line series
     linesRef.current.forEach(line => {
-      if (chartRef.current) {
-        try {
-          chartRef.current.removeSeries(line)
-        } catch (e) {}
-      }
+      try {
+        chartRef.current.removeSeries(line)
+      } catch (e) {}
     })
     linesRef.current = []
 
     // Redraw all saved drawings
     drawings.forEach(drawing => {
-      if (chartRef.current) {
-        const lineSeries = chartRef.current.addLineSeries({
-          color: drawing.color || '#f59e0b',
-          lineWidth: 2,
-          lineStyle: 0,
-          crosshairMarkerVisible: false,
-          lastValueVisible: false,
-          priceLineVisible: false,
-        })
-
-        lineSeries.setData([
-          { time: drawing.start.time, value: drawing.start.price },
-          { time: drawing.end.time, value: drawing.end.price },
-        ])
-
-        linesRef.current.push(lineSeries)
+      switch (drawing.type) {
+        case 'line':
+        case 'ray':
+          drawLine(drawing)
+          break
+        case 'horizontal':
+          drawHorizontalLine(drawing)
+          break
+        case 'vertical':
+          drawVerticalLine(drawing)
+          break
+        case 'fib':
+          drawFibonacci(drawing)
+          break
+        case 'rect':
+          drawRectangle(drawing)
+          break
+        case 'range':
+          drawPriceRange(drawing)
+          break
+        case 'text':
+          // Text is handled via markers
+          break
       }
     })
-  }
+
+    // Update markers for text annotations
+    updateTextMarkers()
+  }, [drawings])
 
   useEffect(() => {
     if (chartRef.current && drawings.length >= 0) {
-      redrawLines()
+      redrawAllDrawings()
     }
-  }, [drawings])
+  }, [drawings, redrawAllDrawings])
+
+  // Drawing functions
+  const drawLine = (drawing) => {
+    if (!chartRef.current) return
+
+    const lineSeries = chartRef.current.addLineSeries({
+      color: drawing.color || '#f59e0b',
+      lineWidth: 2,
+      lineStyle: 0,
+      crosshairMarkerVisible: false,
+      lastValueVisible: false,
+      priceLineVisible: false,
+    })
+
+    // For ray, extend the line
+    let endTime = drawing.end.time
+    let endPrice = drawing.end.price
+
+    if (drawing.type === 'ray' && data.length > 0) {
+      const lastDate = data[data.length - 1].date
+      const slope = (drawing.end.price - drawing.start.price) /
+                   (new Date(drawing.end.time).getTime() - new Date(drawing.start.time).getTime())
+      const timeDiff = new Date(lastDate).getTime() - new Date(drawing.start.time).getTime()
+      endPrice = drawing.start.price + slope * timeDiff
+      endTime = lastDate
+    }
+
+    lineSeries.setData([
+      { time: drawing.start.time, value: drawing.start.price },
+      { time: endTime, value: endPrice },
+    ])
+
+    linesRef.current.push(lineSeries)
+  }
+
+  const drawHorizontalLine = (drawing) => {
+    if (!chartRef.current || !data.length) return
+
+    const lineSeries = chartRef.current.addLineSeries({
+      color: drawing.color || '#3b82f6',
+      lineWidth: 1,
+      lineStyle: 2,
+      crosshairMarkerVisible: false,
+      lastValueVisible: true,
+      priceLineVisible: false,
+    })
+
+    lineSeries.setData([
+      { time: data[0].date, value: drawing.price },
+      { time: data[data.length - 1].date, value: drawing.price },
+    ])
+
+    linesRef.current.push(lineSeries)
+  }
+
+  const drawVerticalLine = (drawing) => {
+    // Vertical lines are drawn as markers on the candlestick series
+    if (!candlestickSeriesRef.current) return
+
+    // We'll use a thin line series as a workaround
+    const minPrice = Math.min(...data.map(d => d.low))
+    const maxPrice = Math.max(...data.map(d => d.high))
+
+    const lineSeries = chartRef.current.addLineSeries({
+      color: drawing.color || '#8b5cf6',
+      lineWidth: 1,
+      lineStyle: 2,
+      crosshairMarkerVisible: false,
+      lastValueVisible: false,
+      priceLineVisible: false,
+    })
+
+    // Create vertical effect with two points at same time
+    lineSeries.setData([
+      { time: drawing.time, value: minPrice },
+      { time: drawing.time, value: maxPrice },
+    ])
+
+    linesRef.current.push(lineSeries)
+  }
+
+  const drawFibonacci = (drawing) => {
+    if (!chartRef.current || !data.length) return
+
+    const high = Math.max(drawing.start.price, drawing.end.price)
+    const low = Math.min(drawing.start.price, drawing.end.price)
+    const range = high - low
+
+    FIB_LEVELS.forEach((level, index) => {
+      const price = high - (range * level)
+
+      const lineSeries = chartRef.current.addLineSeries({
+        color: FIB_COLORS[index],
+        lineWidth: 1,
+        lineStyle: level === 0.5 ? 0 : 2,
+        crosshairMarkerVisible: false,
+        lastValueVisible: true,
+        priceLineVisible: false,
+        title: `${(level * 100).toFixed(1)}%`,
+      })
+
+      lineSeries.setData([
+        { time: data[0].date, value: price },
+        { time: data[data.length - 1].date, value: price },
+      ])
+
+      linesRef.current.push(lineSeries)
+    })
+  }
+
+  const drawRectangle = (drawing) => {
+    if (!chartRef.current) return
+
+    // Draw rectangle as 4 lines
+    const { start, end, color = '#22c55e' } = drawing
+
+    // Top line
+    const topLine = chartRef.current.addLineSeries({
+      color,
+      lineWidth: 2,
+      crosshairMarkerVisible: false,
+      lastValueVisible: false,
+      priceLineVisible: false,
+    })
+    topLine.setData([
+      { time: start.time, value: Math.max(start.price, end.price) },
+      { time: end.time, value: Math.max(start.price, end.price) },
+    ])
+    linesRef.current.push(topLine)
+
+    // Bottom line
+    const bottomLine = chartRef.current.addLineSeries({
+      color,
+      lineWidth: 2,
+      crosshairMarkerVisible: false,
+      lastValueVisible: false,
+      priceLineVisible: false,
+    })
+    bottomLine.setData([
+      { time: start.time, value: Math.min(start.price, end.price) },
+      { time: end.time, value: Math.min(start.price, end.price) },
+    ])
+    linesRef.current.push(bottomLine)
+
+    // Left line (approximate with area)
+    const leftLine = chartRef.current.addLineSeries({
+      color,
+      lineWidth: 2,
+      crosshairMarkerVisible: false,
+      lastValueVisible: false,
+      priceLineVisible: false,
+    })
+    leftLine.setData([
+      { time: start.time, value: start.price },
+      { time: start.time, value: end.price },
+    ])
+    linesRef.current.push(leftLine)
+
+    // Right line
+    const rightLine = chartRef.current.addLineSeries({
+      color,
+      lineWidth: 2,
+      crosshairMarkerVisible: false,
+      lastValueVisible: false,
+      priceLineVisible: false,
+    })
+    rightLine.setData([
+      { time: end.time, value: start.price },
+      { time: end.time, value: end.price },
+    ])
+    linesRef.current.push(rightLine)
+  }
+
+  const drawPriceRange = (drawing) => {
+    if (!chartRef.current) return
+
+    const { start, end } = drawing
+    const priceDiff = end.price - start.price
+    const percentChange = ((priceDiff / start.price) * 100).toFixed(2)
+
+    // Draw the range lines
+    const lineSeries = chartRef.current.addLineSeries({
+      color: priceDiff >= 0 ? '#10b981' : '#ef4444',
+      lineWidth: 2,
+      lineStyle: 0,
+      crosshairMarkerVisible: false,
+      lastValueVisible: false,
+      priceLineVisible: false,
+    })
+
+    lineSeries.setData([
+      { time: start.time, value: start.price },
+      { time: end.time, value: end.price },
+    ])
+
+    linesRef.current.push(lineSeries)
+
+    // Horizontal lines at start and end prices
+    const startLine = chartRef.current.addLineSeries({
+      color: '#64748b',
+      lineWidth: 1,
+      lineStyle: 2,
+      crosshairMarkerVisible: false,
+      lastValueVisible: false,
+      priceLineVisible: false,
+    })
+    startLine.setData([
+      { time: start.time, value: start.price },
+      { time: end.time, value: start.price },
+    ])
+    linesRef.current.push(startLine)
+
+    const endLine = chartRef.current.addLineSeries({
+      color: '#64748b',
+      lineWidth: 1,
+      lineStyle: 2,
+      crosshairMarkerVisible: false,
+      lastValueVisible: false,
+      priceLineVisible: false,
+    })
+    endLine.setData([
+      { time: start.time, value: end.price },
+      { time: end.time, value: end.price },
+    ])
+    linesRef.current.push(endLine)
+  }
+
+  const updateTextMarkers = () => {
+    if (!candlestickSeriesRef.current) return
+
+    const textDrawings = drawings.filter(d => d.type === 'text')
+    const markers = textDrawings.map(d => ({
+      time: d.time,
+      position: 'aboveBar',
+      color: d.color || '#f59e0b',
+      shape: 'text',
+      text: d.text,
+    }))
+
+    candlestickSeriesRef.current.setMarkers(markers)
+  }
 
   // Handle chart click for drawing
   const handleChartClick = (e) => {
@@ -199,25 +466,56 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
     const y = e.clientY - rect.top
 
     const timeScale = chartRef.current.timeScale()
-    const priceScale = candlestickSeriesRef.current.priceScale()
-
-    // Get logical coordinates
     const time = timeScale.coordinateToTime(x)
     const price = candlestickSeriesRef.current.coordinateToPrice(y)
 
     if (!time || !price) return
 
+    // Handle text annotation separately
+    if (drawingMode === 'text') {
+      setPendingTextPoint({ time, price })
+      setShowTextModal(true)
+      return
+    }
+
+    // Handle vertical line (only needs one click)
+    if (drawingMode === 'vertical') {
+      const newDrawing = {
+        id: Date.now(),
+        type: 'vertical',
+        time,
+        color: '#8b5cf6',
+      }
+      setDrawings(prev => [...prev, newDrawing])
+      setDrawingMode(null)
+      setIsDrawing(false)
+      return
+    }
+
+    // Handle horizontal line (only needs one click)
+    if (drawingMode === 'horizontal') {
+      const newDrawing = {
+        id: Date.now(),
+        type: 'horizontal',
+        price,
+        color: '#3b82f6',
+      }
+      setDrawings(prev => [...prev, newDrawing])
+      setDrawingMode(null)
+      setIsDrawing(false)
+      return
+    }
+
+    // Two-click drawings
     if (!startPoint) {
-      // First click - set start point
       setStartPoint({ time, price })
     } else {
-      // Second click - complete the line
       const newDrawing = {
         id: Date.now(),
         type: drawingMode,
         start: startPoint,
         end: { time, price },
-        color: '#f59e0b',
+        color: getDrawingColor(drawingMode),
       }
 
       setDrawings(prev => [...prev, newDrawing])
@@ -225,6 +523,38 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
       setDrawingMode(null)
       setIsDrawing(false)
     }
+  }
+
+  const getDrawingColor = (type) => {
+    const colors = {
+      line: '#f59e0b',
+      ray: '#f97316',
+      fib: '#8b5cf6',
+      rect: '#22c55e',
+      range: '#3b82f6',
+    }
+    return colors[type] || '#f59e0b'
+  }
+
+  // Handle text submission
+  const handleTextSubmit = () => {
+    if (!textInput.trim() || !pendingTextPoint) return
+
+    const newDrawing = {
+      id: Date.now(),
+      type: 'text',
+      time: pendingTextPoint.time,
+      price: pendingTextPoint.price,
+      text: textInput,
+      color: '#f59e0b',
+    }
+
+    setDrawings(prev => [...prev, newDrawing])
+    setTextInput('')
+    setShowTextModal(false)
+    setPendingTextPoint(null)
+    setDrawingMode(null)
+    setIsDrawing(false)
   }
 
   // Delete a specific drawing
@@ -238,6 +568,41 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
     localStorage.removeItem(`drawings_${symbol}`)
   }
 
+  // Cancel drawing
+  const cancelDrawing = () => {
+    setIsDrawing(false)
+    setDrawingMode(null)
+    setStartPoint(null)
+    setShowTextModal(false)
+    setPendingTextPoint(null)
+  }
+
+  // Get drawing description
+  const getDrawingDescription = (drawing) => {
+    switch (drawing.type) {
+      case 'line':
+        return `Line: $${drawing.start.price?.toFixed(2)} → $${drawing.end.price?.toFixed(2)}`
+      case 'horizontal':
+        return `H-Line: $${drawing.price?.toFixed(2)}`
+      case 'vertical':
+        return `V-Line: ${drawing.time}`
+      case 'ray':
+        return `Ray: $${drawing.start.price?.toFixed(2)} → $${drawing.end.price?.toFixed(2)}`
+      case 'fib':
+        return `Fib: $${Math.min(drawing.start.price, drawing.end.price)?.toFixed(2)} - $${Math.max(drawing.start.price, drawing.end.price)?.toFixed(2)}`
+      case 'rect':
+        return `Box: $${drawing.start.price?.toFixed(2)} - $${drawing.end.price?.toFixed(2)}`
+      case 'range':
+        const diff = drawing.end.price - drawing.start.price
+        const pct = ((diff / drawing.start.price) * 100).toFixed(2)
+        return `Range: ${diff >= 0 ? '+' : ''}$${diff.toFixed(2)} (${pct}%)`
+      case 'text':
+        return `Text: "${drawing.text}"`
+      default:
+        return drawing.type
+    }
+  }
+
   // Get latest candle info
   const latestCandle = data?.[data.length - 1]
   const firstCandle = data?.[0]
@@ -246,7 +611,7 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
     : 0
 
   return (
-    <div className="chart-container">
+    <div className="chart-container relative">
       {/* Chart Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
         <div className="flex items-center gap-4">
@@ -261,46 +626,15 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
           )}
         </div>
 
-        {/* Drawing Tools */}
+        {/* Quick Actions */}
         <div className="flex items-center gap-2">
-          <div className="flex gap-1 bg-slate-800 rounded-lg p-1">
-            <button
-              onClick={() => { setDrawingMode('line'); setIsDrawing(true); setStartPoint(null); }}
-              className={`px-3 py-1.5 rounded text-sm transition-all flex items-center gap-1 ${
-                drawingMode === 'line'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-700'
-              }`}
-              title="Trend Line"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 20l16-16" />
-              </svg>
-              Line
-            </button>
-            <button
-              onClick={() => { setDrawingMode('horizontal'); setIsDrawing(true); setStartPoint(null); }}
-              className={`px-3 py-1.5 rounded text-sm transition-all flex items-center gap-1 ${
-                drawingMode === 'horizontal'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-700'
-              }`}
-              title="Horizontal Line"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12h16" />
-              </svg>
-              H-Line
-            </button>
-          </div>
-
           {drawings.length > 0 && (
             <button
               onClick={clearAllDrawings}
               className="px-3 py-1.5 rounded text-sm bg-red-600/20 text-red-400 hover:bg-red-600/30 transition-all"
               title="Clear All Drawings"
             >
-              Clear All
+              Clear All ({drawings.length})
             </button>
           )}
 
@@ -316,15 +650,40 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
         </div>
       </div>
 
+      {/* Drawing Tools Bar */}
+      <div className="flex items-center gap-1 px-4 py-2 border-b border-slate-800 bg-slate-900/50 overflow-x-auto">
+        <span className="text-xs text-slate-500 mr-2 whitespace-nowrap">Drawing Tools:</span>
+        {drawingTools.map(tool => (
+          <button
+            key={tool.id}
+            onClick={() => { setDrawingMode(tool.id); setIsDrawing(true); setStartPoint(null); }}
+            className={`px-3 py-1.5 rounded text-sm transition-all flex items-center gap-1 whitespace-nowrap ${
+              drawingMode === tool.id
+                ? 'bg-blue-600 text-white'
+                : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
+            }`}
+            title={tool.description}
+          >
+            <span>{tool.icon}</span>
+            <span className="hidden sm:inline">{tool.label}</span>
+          </button>
+        ))}
+      </div>
+
       {/* Drawing Mode Indicator */}
       {isDrawing && (
         <div className="bg-amber-600/20 border-b border-amber-500/30 px-4 py-2 flex items-center justify-between">
           <span className="text-amber-400 text-sm">
-            {startPoint ? 'Click to set end point' : 'Click to set start point'} for {drawingMode} drawing
+            {drawingMode === 'horizontal' || drawingMode === 'vertical' || drawingMode === 'text'
+              ? 'Click on chart to place'
+              : startPoint
+                ? 'Click to set end point'
+                : 'Click to set start point'
+            } for {drawingTools.find(t => t.id === drawingMode)?.label || drawingMode}
           </span>
           <button
-            onClick={() => { setIsDrawing(false); setDrawingMode(null); setStartPoint(null); }}
-            className="text-amber-400 hover:text-amber-300 text-sm"
+            onClick={cancelDrawing}
+            className="text-amber-400 hover:text-amber-300 text-sm px-2 py-1 bg-amber-600/20 rounded"
           >
             Cancel (ESC)
           </button>
@@ -346,26 +705,57 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
       <div
         ref={chartContainerRef}
         onClick={handleChartClick}
-        className={`cursor-${isDrawing ? 'crosshair' : 'default'}`}
+        className={isDrawing ? 'cursor-crosshair' : 'cursor-default'}
       />
+
+      {/* Text Input Modal */}
+      {showTextModal && (
+        <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-slate-800 rounded-lg p-4 w-80 shadow-xl border border-slate-700">
+            <h3 className="text-white font-medium mb-3">Add Text Annotation</h3>
+            <input
+              type="text"
+              value={textInput}
+              onChange={(e) => setTextInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleTextSubmit()}
+              placeholder="Enter your text..."
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:border-blue-500 outline-none mb-3"
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={handleTextSubmit}
+                className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-all"
+              >
+                Add
+              </button>
+              <button
+                onClick={cancelDrawing}
+                className="flex-1 px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Drawings List */}
       {drawings.length > 0 && (
-        <div className="px-4 py-2 border-t border-slate-800 bg-slate-900/50">
+        <div className="px-4 py-2 border-t border-slate-800 bg-slate-900/50 max-h-32 overflow-y-auto">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs text-slate-500 uppercase tracking-wide">Saved Drawings ({drawings.length})</span>
           </div>
           <div className="flex flex-wrap gap-2">
-            {drawings.map((drawing, i) => (
+            {drawings.map((drawing) => (
               <div
                 key={drawing.id}
-                className="flex items-center gap-2 bg-slate-800 rounded px-2 py-1 text-xs"
+                className="flex items-center gap-2 bg-slate-800 rounded px-2 py-1 text-xs group"
               >
-                <span className="text-amber-400">Line {i + 1}</span>
-                <span className="text-slate-500">${drawing.start.price?.toFixed(2)} → ${drawing.end.price?.toFixed(2)}</span>
+                <span className="text-slate-400">{getDrawingDescription(drawing)}</span>
                 <button
                   onClick={() => deleteDrawing(drawing.id)}
-                  className="text-red-400 hover:text-red-300 ml-1"
+                  className="text-red-400 hover:text-red-300 opacity-50 group-hover:opacity-100 transition-opacity"
                 >
                   ×
                 </button>
