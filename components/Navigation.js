@@ -17,7 +17,7 @@ export default function Navigation() {
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex items-center justify-between h-14">
           <div className="flex items-center">
-            <span className="text-xl font-bold text-green-500">StockViz</span>
+            <span className="text-xl font-bold text-green-500">runnr</span>
             <div className="ml-10 flex space-x-4">
               {links.map(link => (
                 <Link

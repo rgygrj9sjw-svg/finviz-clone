@@ -1,6 +1,6 @@
-// ICT Analysis API - Uses Alpaca for real OHLC data
+// ICT Analysis API - Uses Yahoo Finance for free OHLC data
 
-import { getDailyBars, getWeeklyBars, getLatestTrade } from '../../lib/alpaca'
+import { getDailyBars, getWeeklyBars, getCurrentQuote } from '../../lib/yahoo'
 import { runFullICTAnalysis } from '../../lib/ict'
 
 export default async function handler(req, res) {
@@ -11,34 +11,23 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Fetch all required data from Alpaca
-    const [dailyBars, weeklyBars, latestTrade] = await Promise.all([
+    // Fetch all required data from Yahoo Finance
+    const [dailyBars, weeklyBars, quote] = await Promise.all([
       getDailyBars(symbol.toUpperCase(), 100),
       getWeeklyBars(symbol.toUpperCase(), 50),
-      getLatestTrade(symbol.toUpperCase()),
+      getCurrentQuote(symbol.toUpperCase()),
     ])
 
     if (!dailyBars || dailyBars.length === 0) {
       return res.status(404).json({ error: 'No data found for symbol' })
     }
 
-    // Format bars for ICT analysis
-    const formatBars = (bars) => bars.map(bar => ({
-      t: bar.t,
-      o: bar.o,
-      h: bar.h,
-      l: bar.l,
-      c: bar.c,
-      v: bar.v,
-    }))
-
-    const formattedDaily = formatBars(dailyBars)
-    const formattedWeekly = formatBars(weeklyBars)
-    const currentPrice = latestTrade?.p || formattedDaily[formattedDaily.length - 1]?.c
+    const currentPrice = quote?.price || dailyBars[dailyBars.length - 1]?.c
 
     // Run full ICT analysis
-    const analysis = runFullICTAnalysis(formattedDaily, formattedWeekly, currentPrice)
+    const analysis = runFullICTAnalysis(dailyBars, weeklyBars, currentPrice)
     analysis.ticker = symbol.toUpperCase()
+    analysis.quote = quote
 
     res.status(200).json(analysis)
   } catch (error) {
