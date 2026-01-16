@@ -1,9 +1,16 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { createChart, CrosshairMode } from 'lightweight-charts'
 
-// Fibonacci levels
-const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1]
-const FIB_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ef4444']
+// Default Fibonacci levels
+const DEFAULT_FIB_LEVELS = [
+  { level: 0, color: '#ef4444', label: '0%' },
+  { level: 0.236, color: '#f97316', label: '23.6%' },
+  { level: 0.382, color: '#eab308', label: '38.2%' },
+  { level: 0.5, color: '#22c55e', label: '50%' },
+  { level: 0.618, color: '#3b82f6', label: '61.8%' },
+  { level: 0.786, color: '#8b5cf6', label: '78.6%' },
+  { level: 1, color: '#ef4444', label: '100%' },
+]
 
 export default function TradingChart({ data, symbol, height = 500, onAIAnalysis }) {
   const chartContainerRef = useRef(null)
@@ -16,8 +23,11 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
   const [textInput, setTextInput] = useState('')
   const [showTextModal, setShowTextModal] = useState(false)
   const [pendingTextPoint, setPendingTextPoint] = useState(null)
+  const [showFibSettings, setShowFibSettings] = useState(false)
+  const [fibLevels, setFibLevels] = useState(DEFAULT_FIB_LEVELS)
+  const [newFibLevel, setNewFibLevel] = useState('')
+  const [newFibColor, setNewFibColor] = useState('#f59e0b')
   const linesRef = useRef([])
-  const markersRef = useRef([])
 
   // Drawing tools configuration
   const drawingTools = [
@@ -31,14 +41,23 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
     { id: 'text', icon: '💬', label: 'Text', description: 'Add text annotation' },
   ]
 
-  // Load saved drawings from localStorage
+  // Load saved drawings and fib levels from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem(`drawings_${symbol}`)
-    if (saved) {
+    const savedDrawings = localStorage.getItem(`drawings_${symbol}`)
+    if (savedDrawings) {
       try {
-        setDrawings(JSON.parse(saved))
+        setDrawings(JSON.parse(savedDrawings))
       } catch (e) {
         console.error('Failed to load drawings:', e)
+      }
+    }
+
+    const savedFibLevels = localStorage.getItem('custom_fib_levels')
+    if (savedFibLevels) {
+      try {
+        setFibLevels(JSON.parse(savedFibLevels))
+      } catch (e) {
+        console.error('Failed to load fib levels:', e)
       }
     }
   }, [symbol])
@@ -49,6 +68,11 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
       localStorage.setItem(`drawings_${symbol}`, JSON.stringify(drawings))
     }
   }, [drawings, symbol])
+
+  // Save fib levels to localStorage
+  useEffect(() => {
+    localStorage.setItem('custom_fib_levels', JSON.stringify(fibLevels))
+  }, [fibLevels])
 
   // Initialize chart
   useEffect(() => {
@@ -201,20 +225,18 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
           drawPriceRange(drawing)
           break
         case 'text':
-          // Text is handled via markers
           break
       }
     })
 
-    // Update markers for text annotations
     updateTextMarkers()
-  }, [drawings])
+  }, [drawings, fibLevels])
 
   useEffect(() => {
     if (chartRef.current && drawings.length >= 0) {
       redrawAllDrawings()
     }
-  }, [drawings, redrawAllDrawings])
+  }, [drawings, redrawAllDrawings, fibLevels])
 
   // Drawing functions
   const drawLine = (drawing) => {
@@ -229,7 +251,6 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
       priceLineVisible: false,
     })
 
-    // For ray, extend the line
     let endTime = drawing.end.time
     let endPrice = drawing.end.price
 
@@ -271,10 +292,8 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
   }
 
   const drawVerticalLine = (drawing) => {
-    // Vertical lines are drawn as markers on the candlestick series
     if (!candlestickSeriesRef.current) return
 
-    // We'll use a thin line series as a workaround
     const minPrice = Math.min(...data.map(d => d.low))
     const maxPrice = Math.max(...data.map(d => d.high))
 
@@ -287,7 +306,6 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
       priceLineVisible: false,
     })
 
-    // Create vertical effect with two points at same time
     lineSeries.setData([
       { time: drawing.time, value: minPrice },
       { time: drawing.time, value: maxPrice },
@@ -303,17 +321,18 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
     const low = Math.min(drawing.start.price, drawing.end.price)
     const range = high - low
 
-    FIB_LEVELS.forEach((level, index) => {
-      const price = high - (range * level)
+    // Use custom fib levels
+    fibLevels.forEach((fibLevel) => {
+      const price = high - (range * fibLevel.level)
 
       const lineSeries = chartRef.current.addLineSeries({
-        color: FIB_COLORS[index],
+        color: fibLevel.color,
         lineWidth: 1,
-        lineStyle: level === 0.5 ? 0 : 2,
+        lineStyle: fibLevel.level === 0.5 ? 0 : 2,
         crosshairMarkerVisible: false,
         lastValueVisible: true,
         priceLineVisible: false,
-        title: `${(level * 100).toFixed(1)}%`,
+        title: fibLevel.label,
       })
 
       lineSeries.setData([
@@ -328,10 +347,8 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
   const drawRectangle = (drawing) => {
     if (!chartRef.current) return
 
-    // Draw rectangle as 4 lines
     const { start, end, color = '#22c55e' } = drawing
 
-    // Top line
     const topLine = chartRef.current.addLineSeries({
       color,
       lineWidth: 2,
@@ -345,7 +362,6 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
     ])
     linesRef.current.push(topLine)
 
-    // Bottom line
     const bottomLine = chartRef.current.addLineSeries({
       color,
       lineWidth: 2,
@@ -359,7 +375,6 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
     ])
     linesRef.current.push(bottomLine)
 
-    // Left line (approximate with area)
     const leftLine = chartRef.current.addLineSeries({
       color,
       lineWidth: 2,
@@ -373,7 +388,6 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
     ])
     linesRef.current.push(leftLine)
 
-    // Right line
     const rightLine = chartRef.current.addLineSeries({
       color,
       lineWidth: 2,
@@ -393,9 +407,7 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
 
     const { start, end } = drawing
     const priceDiff = end.price - start.price
-    const percentChange = ((priceDiff / start.price) * 100).toFixed(2)
 
-    // Draw the range lines
     const lineSeries = chartRef.current.addLineSeries({
       color: priceDiff >= 0 ? '#10b981' : '#ef4444',
       lineWidth: 2,
@@ -412,7 +424,6 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
 
     linesRef.current.push(lineSeries)
 
-    // Horizontal lines at start and end prices
     const startLine = chartRef.current.addLineSeries({
       color: '#64748b',
       lineWidth: 1,
@@ -471,14 +482,12 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
 
     if (!time || !price) return
 
-    // Handle text annotation separately
     if (drawingMode === 'text') {
       setPendingTextPoint({ time, price })
       setShowTextModal(true)
       return
     }
 
-    // Handle vertical line (only needs one click)
     if (drawingMode === 'vertical') {
       const newDrawing = {
         id: Date.now(),
@@ -492,7 +501,6 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
       return
     }
 
-    // Handle horizontal line (only needs one click)
     if (drawingMode === 'horizontal') {
       const newDrawing = {
         id: Date.now(),
@@ -506,7 +514,6 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
       return
     }
 
-    // Two-click drawings
     if (!startPoint) {
       setStartPoint({ time, price })
     } else {
@@ -536,7 +543,6 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
     return colors[type] || '#f59e0b'
   }
 
-  // Handle text submission
   const handleTextSubmit = () => {
     if (!textInput.trim() || !pendingTextPoint) return
 
@@ -557,18 +563,15 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
     setIsDrawing(false)
   }
 
-  // Delete a specific drawing
   const deleteDrawing = (id) => {
     setDrawings(prev => prev.filter(d => d.id !== id))
   }
 
-  // Clear all drawings
   const clearAllDrawings = () => {
     setDrawings([])
     localStorage.removeItem(`drawings_${symbol}`)
   }
 
-  // Cancel drawing
   const cancelDrawing = () => {
     setIsDrawing(false)
     setDrawingMode(null)
@@ -577,7 +580,40 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
     setPendingTextPoint(null)
   }
 
-  // Get drawing description
+  // Fibonacci level management
+  const addFibLevel = () => {
+    const levelValue = parseFloat(newFibLevel) / 100
+    if (isNaN(levelValue) || levelValue < 0 || levelValue > 10) return
+
+    const newLevel = {
+      level: levelValue,
+      color: newFibColor,
+      label: `${newFibLevel}%`,
+    }
+
+    setFibLevels(prev => [...prev, newLevel].sort((a, b) => a.level - b.level))
+    setNewFibLevel('')
+  }
+
+  const removeFibLevel = (index) => {
+    setFibLevels(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const updateFibLevel = (index, field, value) => {
+    setFibLevels(prev => prev.map((level, i) => {
+      if (i !== index) return level
+      if (field === 'level') {
+        const numValue = parseFloat(value) / 100
+        return { ...level, level: numValue, label: `${value}%` }
+      }
+      return { ...level, [field]: value }
+    }))
+  }
+
+  const resetFibLevels = () => {
+    setFibLevels(DEFAULT_FIB_LEVELS)
+  }
+
   const getDrawingDescription = (drawing) => {
     switch (drawing.type) {
       case 'line':
@@ -603,7 +639,6 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
     }
   }
 
-  // Get latest candle info
   const latestCandle = data?.[data.length - 1]
   const firstCandle = data?.[0]
   const change = latestCandle && firstCandle
@@ -626,8 +661,16 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
           )}
         </div>
 
-        {/* Quick Actions */}
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowFibSettings(true)}
+            className="px-3 py-1.5 rounded text-sm bg-purple-600/20 text-purple-400 hover:bg-purple-600/30 transition-all flex items-center gap-1"
+            title="Customize Fibonacci Levels"
+          >
+            <span>🔢</span>
+            Fib Settings
+          </button>
+
           {drawings.length > 0 && (
             <button
               onClick={clearAllDrawings}
@@ -707,6 +750,100 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
         onClick={handleChartClick}
         className={isDrawing ? 'cursor-crosshair' : 'cursor-default'}
       />
+
+      {/* Fibonacci Settings Modal */}
+      {showFibSettings && (
+        <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="bg-slate-800 rounded-lg p-5 w-96 max-h-[80vh] overflow-y-auto shadow-xl border border-slate-700">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-white font-bold text-lg">Fibonacci Settings</h3>
+              <button
+                onClick={() => setShowFibSettings(false)}
+                className="text-slate-400 hover:text-white text-xl"
+              >
+                ×
+              </button>
+            </div>
+
+            <p className="text-slate-400 text-sm mb-4">
+              Customize your Fibonacci retracement levels. Changes apply to all new Fibonacci drawings.
+            </p>
+
+            {/* Current Levels */}
+            <div className="space-y-2 mb-4">
+              <div className="text-xs text-slate-500 uppercase tracking-wide">Current Levels</div>
+              {fibLevels.map((level, index) => (
+                <div key={index} className="flex items-center gap-2 bg-slate-900 rounded p-2">
+                  <input
+                    type="color"
+                    value={level.color}
+                    onChange={(e) => updateFibLevel(index, 'color', e.target.value)}
+                    className="w-8 h-8 rounded cursor-pointer bg-transparent"
+                  />
+                  <input
+                    type="number"
+                    value={(level.level * 100).toFixed(1)}
+                    onChange={(e) => updateFibLevel(index, 'level', e.target.value)}
+                    className="flex-1 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-sm"
+                    step="0.1"
+                  />
+                  <span className="text-slate-400">%</span>
+                  <button
+                    onClick={() => removeFibLevel(index)}
+                    className="text-red-400 hover:text-red-300 px-2"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Add New Level */}
+            <div className="border-t border-slate-700 pt-4 mb-4">
+              <div className="text-xs text-slate-500 uppercase tracking-wide mb-2">Add New Level</div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={newFibColor}
+                  onChange={(e) => setNewFibColor(e.target.value)}
+                  className="w-8 h-8 rounded cursor-pointer bg-transparent"
+                />
+                <input
+                  type="number"
+                  value={newFibLevel}
+                  onChange={(e) => setNewFibLevel(e.target.value)}
+                  placeholder="e.g., 88.6"
+                  className="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
+                  step="0.1"
+                />
+                <span className="text-slate-400">%</span>
+                <button
+                  onClick={addFibLevel}
+                  className="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded transition-all"
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2">
+              <button
+                onClick={resetFibLevels}
+                className="flex-1 px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded transition-all"
+              >
+                Reset to Default
+              </button>
+              <button
+                onClick={() => setShowFibSettings(false)}
+                className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded transition-all"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Text Input Modal */}
       {showTextModal && (
