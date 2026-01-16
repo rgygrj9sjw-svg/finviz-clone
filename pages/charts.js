@@ -162,8 +162,7 @@ export default function Charts() {
         {showAiPanel && (
           <div className="card p-4">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <span className="text-2xl">🤖</span>
+              <h3 className="text-lg font-bold text-white">
                 AI Chart Analysis
               </h3>
               <button
@@ -316,7 +315,9 @@ export default function Charts() {
                   </div>
                 </div>
                 <div className={`w-10 h-10 ${changePercent >= 0 ? 'bg-emerald-500/20' : 'bg-red-500/20'} rounded-lg flex items-center justify-center`}>
-                  <span className="text-xl">{changePercent >= 0 ? '📈' : '📉'}</span>
+                  <svg className={`w-5 h-5 ${changePercent >= 0 ? 'text-emerald-400' : 'text-red-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={changePercent >= 0 ? "M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" : "M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"} />
+                  </svg>
                 </div>
               </div>
             </div>
@@ -329,7 +330,9 @@ export default function Charts() {
                   <div className="text-sm text-slate-500">Highest point</div>
                 </div>
                 <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center">
-                  <span className="text-xl">🔺</span>
+                  <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                  </svg>
                 </div>
               </div>
             </div>
@@ -342,7 +345,9 @@ export default function Charts() {
                   <div className="text-sm text-slate-500">Lowest point</div>
                 </div>
                 <div className="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center">
-                  <span className="text-xl">🔻</span>
+                  <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                  </svg>
                 </div>
               </div>
             </div>
@@ -355,7 +360,9 @@ export default function Charts() {
                   <div className="text-sm text-slate-500">High - Low</div>
                 </div>
                 <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                  <span className="text-xl">↕️</span>
+                  <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                  </svg>
                 </div>
               </div>
             </div>
@@ -368,7 +375,9 @@ export default function Charts() {
                   <div className="text-sm text-slate-500">Per candle</div>
                 </div>
                 <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                  <span className="text-xl">📊</span>
+                  <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
                 </div>
               </div>
             </div>

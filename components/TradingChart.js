@@ -37,14 +37,14 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
 
   // Drawing tools configuration
   const drawingTools = [
-    { id: 'line', icon: '📏', label: 'Trend Line', description: 'Draw diagonal trend lines' },
-    { id: 'horizontal', icon: '➖', label: 'H-Line', description: 'Horizontal price level' },
+    { id: 'line', icon: '/', label: 'Trend Line', description: 'Draw diagonal trend lines' },
+    { id: 'horizontal', icon: '—', label: 'H-Line', description: 'Horizontal price level' },
     { id: 'vertical', icon: '|', label: 'V-Line', description: 'Vertical time marker' },
-    { id: 'ray', icon: '↗️', label: 'Ray', description: 'Line extending to infinity' },
-    { id: 'fib', icon: '🔢', label: 'Fibonacci', description: 'Fibonacci retracement levels' },
-    { id: 'rect', icon: '⬜', label: 'Rectangle', description: 'Price zone box' },
-    { id: 'range', icon: '📊', label: 'Price Range', description: 'Measure price movement' },
-    { id: 'text', icon: '💬', label: 'Text', description: 'Add text annotation' },
+    { id: 'ray', icon: '/', label: 'Ray', description: 'Line extending to infinity' },
+    { id: 'fib', icon: '%', label: 'Fibonacci', description: 'Fibonacci retracement levels' },
+    { id: 'rect', icon: '▢', label: 'Rectangle', description: 'Price zone box' },
+    { id: 'range', icon: '↕', label: 'Price Range', description: 'Measure price movement' },
+    { id: 'text', icon: 'T', label: 'Text', description: 'Add text annotation' },
   ]
 
   // Load saved drawings and fib levels from localStorage
@@ -726,10 +726,9 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowFibSettings(true)}
-            className="px-3 py-1.5 rounded text-sm bg-purple-600/20 text-purple-400 hover:bg-purple-600/30 transition-all flex items-center gap-1"
+            className="px-3 py-1.5 rounded text-sm bg-purple-600/20 text-purple-400 hover:bg-purple-600/30 transition-all"
             title="Customize Fibonacci Levels"
           >
-            <span>🔢</span>
             Fib Settings
           </button>
 
@@ -746,9 +745,8 @@ export default function TradingChart({ data, symbol, height = 500, onAIAnalysis 
           {onAIAnalysis && (
             <button
               onClick={onAIAnalysis}
-              className="px-3 py-1.5 rounded text-sm bg-purple-600 text-white hover:bg-purple-500 transition-all flex items-center gap-1"
+              className="px-3 py-1.5 rounded text-sm bg-purple-600 text-white hover:bg-purple-500 transition-all"
             >
-              <span>🤖</span>
               AI Analyze
             </button>
           )}

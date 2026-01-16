@@ -95,7 +95,9 @@ export default function HeatMap() {
                 <div className="text-3xl font-bold text-white">{totalStocks}</div>
               </div>
               <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center">
-                <span className="text-2xl">🗺️</span>
+                <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                </svg>
               </div>
             </div>
           </div>
@@ -107,7 +109,9 @@ export default function HeatMap() {
                 <div className="text-3xl font-bold text-emerald-400">{gainers}</div>
               </div>
               <div className="w-12 h-12 bg-emerald-500/20 rounded-xl flex items-center justify-center">
-                <span className="text-2xl">📈</span>
+                <svg className="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
               </div>
             </div>
           </div>
@@ -119,7 +123,9 @@ export default function HeatMap() {
                 <div className="text-3xl font-bold text-red-400">{losers}</div>
               </div>
               <div className="w-12 h-12 bg-red-500/20 rounded-xl flex items-center justify-center">
-                <span className="text-2xl">📉</span>
+                <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
+                </svg>
               </div>
             </div>
           </div>
@@ -204,7 +210,9 @@ export default function HeatMap() {
         ) : (
           <div className="card p-12 text-center">
             <div className="w-16 h-16 bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-3xl">🗺️</span>
+              <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+              </svg>
             </div>
             <p className="text-slate-400 mb-2">No data available</p>
             <p className="text-slate-500 text-sm">Waiting for market data...</p>

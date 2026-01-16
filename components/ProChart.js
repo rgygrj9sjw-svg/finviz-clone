@@ -218,10 +218,10 @@ export default function ProChart({ data, symbol, height = 400 }) {
         {/* Chart Type Selector */}
         <div className="flex gap-1 bg-slate-800 rounded-lg p-1">
           {[
-            { type: 'candle', icon: '📊' },
-            { type: 'line', icon: '📈' },
-            { type: 'area', icon: '📉' },
-          ].map(({ type, icon }) => (
+            { type: 'candle', label: 'Candle' },
+            { type: 'line', label: 'Line' },
+            { type: 'area', label: 'Area' },
+          ].map(({ type, label }) => (
             <button
               key={type}
               onClick={() => setChartType(type)}
@@ -231,7 +231,7 @@ export default function ProChart({ data, symbol, height = 400 }) {
                   : 'text-slate-400 hover:text-white hover:bg-slate-700'
               }`}
             >
-              {icon}
+              {label}
             </button>
           ))}
         </div>

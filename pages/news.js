@@ -75,7 +75,9 @@ export default function News() {
                 <div className="text-3xl font-bold text-white">{news.length}</div>
               </div>
               <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center">
-                <span className="text-2xl">📰</span>
+                <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+                </svg>
               </div>
             </div>
           </div>
@@ -87,7 +89,9 @@ export default function News() {
                 <div className="text-3xl font-bold text-emerald-400">{bullishNews}</div>
               </div>
               <div className="w-12 h-12 bg-emerald-500/20 rounded-xl flex items-center justify-center">
-                <span className="text-2xl">📈</span>
+                <svg className="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
               </div>
             </div>
           </div>
@@ -99,7 +103,9 @@ export default function News() {
                 <div className="text-3xl font-bold text-red-400">{bearishNews}</div>
               </div>
               <div className="w-12 h-12 bg-red-500/20 rounded-xl flex items-center justify-center">
-                <span className="text-2xl">📉</span>
+                <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
+                </svg>
               </div>
             </div>
           </div>
@@ -193,7 +199,9 @@ export default function News() {
         ) : (
           <div className="card p-12 text-center">
             <div className="w-16 h-16 bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-3xl">📰</span>
+              <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+              </svg>
             </div>
             <p className="text-slate-400 mb-2">No news available</p>
             <p className="text-slate-500 text-sm">Check back later for updates</p>
